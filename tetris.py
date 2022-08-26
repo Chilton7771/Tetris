@@ -121,6 +121,7 @@ default_gravity = 1
 gravity = default_gravity
 gameover = False
 
+move = False
 right = False
 left = False
 soft_drop = False
@@ -181,6 +182,7 @@ while True:
 				# checking if tetrimo has touched anything
 				if shape_origin_y+piece[0] == 19 or grid_permanent[shape_origin_y+piece[0]+1][shape_origin_x+piece[1]] != 0:
 					# first one is checking for floor, second one is checking for other tetrimo
+
 					next = True
 				else:
 					grid[shape_origin_y+piece[0]][shape_origin_x+piece[1]] = colour
@@ -268,16 +270,31 @@ while True:
 		if left == False:
 			das_start = time.time()
 
-			if shape_origin_x-1 != 0:
-				shape_origin_x -= 1 # intial move before DAS and arr
+			move = True
+
+			for name, shape in tetrimo.items():
+				if name == tetrimo['state']:
+					for piece in shape:
+						if shape_origin_x+piece[1] == 0:
+							move = False
+			
 
 		# check if DAS timer has finished, if DAS filled then do ARR
-		if (time.time()-das_start) > das and left > 0:
+		if (time.time()-das_start) > das and left == True:
+
 			if time.time()-arr_start > arr:
+				move = True
 				arr_start = time.time()
 
-				if shape_origin_x-1 != 0:
-					shape_origin_x -= 1	
+				for name, shape in tetrimo.items():
+					if name == tetrimo['state']:
+						for piece in shape:
+							if shape_origin_x+piece[1] == 0:
+								move = False
+		
+		if move == True:
+			move = False
+			shape_origin_x -= 1
 
 		left = True # state that the previous key is left
 	else:
@@ -290,17 +307,31 @@ while True:
 		# check if right was the previous keypress, if not then restart DAS and do initial move
 		if right == False:
 			das_start = time.time()
+			move = True
 
-			if shape_origin_x+1 != 9:
-					shape_origin_x += 1 # intial move before DAS and arr
+			# this code checks if any piece is on the border of grid, might turn into function later
+			for name, shape in tetrimo.items():
+				if name == tetrimo['state']:
+					for piece in shape:
+						if shape_origin_x+piece[1] == 9:
+							move = False
 
 		# check if DAS timer has finished, if DAS filled then do ARR
-		if (time.time()-das_start) > das and right > 0:
+		if (time.time()-das_start) > das and right == True:
 			if time.time()-arr_start > arr:
 				arr_start = time.time()
+				move = True
 
-				if shape_origin_x+1 != 9:
-					shape_origin_x += 1
+				# this code checks if any piece is on the border of grid, might turn into function later
+				for name, shape in tetrimo.items():
+					if name == tetrimo['state']:
+						for piece in shape:
+							if shape_origin_x+piece[1] == 9:
+								move = False
+
+		if move == True:
+			move = False
+			shape_origin_x += 1
 
 		right = True # state that the previous key is right
 	else:
