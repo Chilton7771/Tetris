@@ -40,6 +40,7 @@ def colour_in(tetrimo, highlight=False):
 			number = 14
 	
 	return number
+    
 
 # hard coded each piece's position cos it was easier than the other methods
 tetrimoes = {
@@ -136,7 +137,6 @@ ghost_origin_y = shape_origin_y
 
 score = 0
 level = 1
-level_lines = 10
 lines_cleared = 0
 
 gravity_timer = time.time()
@@ -162,8 +162,6 @@ sdf = 0.05 # percentage of gravity time
 
 # very disorganised spaghetti loop
 while True:
-
-
 	# GAME
 
 	# gameover
@@ -190,9 +188,8 @@ while True:
 
 			score += 100*level
 			lines_cleared += 1
-			level_lines -= 1
 
-	if level < 15 and level_lines == 0:
+	if (lines_cleared / 10) == level:
 		level += 1
 		default_gravity = (0.8-((level-1)*0.007))**level
 		level_lines = 10
@@ -249,11 +246,12 @@ while True:
 	for name, shape in tetrimo.items():
 		if name == tetrimo['state']:
 			for piece in shape:
-				grid[ghost_origin_y+piece[0]][shape_origin_x+piece[1]] = colour
+				if grid[ghost_origin_y+piece[0]][shape_origin_x+piece[1]] == 0: # lets the real piece have priority
+					grid[ghost_origin_y+piece[0]][shape_origin_x+piece[1]] = colour
 	colour = colour_in(tetrimo) # reverting colour just in case
 
 	if grid != previous_frame: # if nothing has changed, no point in printing new one
-		display = ' _____________________\n| '
+		display = '' # top of box
 		row_number = 0
 
 		for row in grid:
@@ -293,16 +291,19 @@ while True:
 				elif pixel == 14:
 					display += colored('▢ ', 'red')
 					
-					
 			if row_number == 1:
-				display += f'| LEVEL: {level}\n| '
+				display += f'│ LEVEL: {level}\n│ '
 			elif row_number == 2:
-				display += f'| LINES: {lines_cleared}\n| '
+				display += f'│ LINES: {lines_cleared}\n│ '
 			elif row_number == 3:
-				display += f'| SCORE: {score}\n| '
-				
+				display += f'│ SCORE: {score}\n│ '
+			elif row_number == 20:
+				display += '│\n'	
 			else:
-				display += '|\n| '	
+				display += '│\n│ '	
+		
+		display = '┌─────────────────────┐\n│ ' + display # top of box
+		display += '└─────────────────────┘\n' # bottom of box
 		print(display)
 
 	# INPUT
@@ -319,6 +320,26 @@ while True:
 				tetrimo["state"] = "a_upright"
 			elif tetrimo["state"] == "a_upright":
 				tetrimo["state"] = "a_flat"
+			
+			# this code checks if the piece will go through walls because of the rotation
+			for name, shape in tetrimo.items():
+				if name == tetrimo['state']:
+					for piece in shape:
+						if shape_origin_x+piece[1] < 0:
+							shape_origin_x += 1 # moves piece to the right, out of wall
+						elif shape_origin_x+piece[1] > 9: # second bit because pieces can still clip with the opposite rotation
+							shape_origin_x -= 1 # moves piece to the left, out of wall
+
+						# immediately rotating back if pieces go into others when rotating
+						if grid_permanent[shape_origin_y+piece[0]+1][shape_origin_x+piece[1]] > 0:
+							if tetrimo["state"] == "a_flat":
+								tetrimo["state"] = "a_upright"
+							elif tetrimo["state"] == "a_upright":
+								tetrimo["state"] = "b_flat"
+							elif tetrimo["state"] == "b_flat":
+								tetrimo["state"] = "b_upright"
+							elif tetrimo["state"] == "b_upright":
+								tetrimo["state"] = "a_flat"
 		
 		anti_clockwise = True
 	else:
@@ -326,6 +347,7 @@ while True:
 
 	# clockwise
 	if keyboard.is_pressed('r'):
+
 		if clockwise == False:
 			if tetrimo["state"] == "a_flat":
 				tetrimo["state"] = "a_upright"
@@ -335,6 +357,27 @@ while True:
 				tetrimo["state"] = "b_upright"
 			elif tetrimo["state"] == "b_upright":
 				tetrimo["state"] = "a_flat"
+			
+			# this code checks if the piece will go through walls because of the rotation
+			for name, shape in tetrimo.items():
+				if name == tetrimo['state']:
+					for piece in shape:
+						if shape_origin_x+piece[1] > 9:
+							shape_origin_x -= 1 # moves piece to the left, out of wall
+
+						elif shape_origin_x+piece[1] < 0: # second bit because pieces can still clip with the opposite rotation
+							shape_origin_x += 1 # moves piece to the right, out of wall
+						
+						# immediately rotating back if pieces go into others when rotating
+						if grid_permanent[shape_origin_y+piece[0]+1][shape_origin_x+piece[1]] > 0:
+							if tetrimo["state"] == "a_flat":
+								tetrimo["state"] = "b_upright"
+							elif tetrimo["state"] == "b_upright":
+								tetrimo["state"] = "b_flat"
+							elif tetrimo["state"] == "b_flat":
+								tetrimo["state"] = "a_upright"
+							elif tetrimo["state"] == "a_upright":
+								tetrimo["state"] = "a_flat"
 		
 		clockwise = True
 	else:
@@ -346,19 +389,17 @@ while True:
 		# check if left was the previous keypress, if not then restart DAS and do initial move
 		if left == False:
 			das_start = time.time()
-
 			move = True
 
 			for name, shape in tetrimo.items():
 				if name == tetrimo['state']:
 					for piece in shape:
-						if shape_origin_x+piece[1] == 0:
+						if shape_origin_x+piece[1] == 0 or grid_permanent[shape_origin_y+piece[0]+1][shape_origin_x+piece[1]-1] > 0:
 							move = False
 			
 
 		# check if DAS timer has finished, if DAS filled then do ARR
 		if (time.time()-das_start) > das and left == True:
-
 			if time.time()-arr_start > arr:
 				move = True
 				arr_start = time.time()
@@ -366,7 +407,7 @@ while True:
 				for name, shape in tetrimo.items():
 					if name == tetrimo['state']:
 						for piece in shape:
-							if shape_origin_x+piece[1] == 0:
+							if shape_origin_x+piece[1] == 0 or grid_permanent[shape_origin_y+piece[0]][shape_origin_x+piece[1]-1] > 0:
 								move = False
 		
 		if move == True:
@@ -386,11 +427,11 @@ while True:
 			das_start = time.time()
 			move = True
 
-			# this code checks if any piece is on the border of grid, might turn into function later
+			# this code checks if any piece is on the border of grid
 			for name, shape in tetrimo.items():
 				if name == tetrimo['state']:
 					for piece in shape:
-						if shape_origin_x+piece[1] == 9:
+						if shape_origin_x+piece[1] == 9 or grid_permanent[shape_origin_y+piece[0]][shape_origin_x+piece[1]+1] > 0:
 							move = False
 
 		# check if DAS timer has finished, if DAS filled then do ARR
@@ -403,7 +444,7 @@ while True:
 				for name, shape in tetrimo.items():
 					if name == tetrimo['state']:
 						for piece in shape:
-							if shape_origin_x+piece[1] == 9:
+							if shape_origin_x+piece[1] == 9 or grid_permanent[shape_origin_y+piece[0]+1][shape_origin_x+piece[1]+1] > 0:
 								move = False
 
 		if move == True:
