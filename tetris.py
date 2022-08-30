@@ -1,3 +1,5 @@
+# this tetris game was created by Chilton Cai
+
 import copy
 import keyboard
 import random
@@ -5,6 +7,7 @@ import time
 from termcolor import colored
 
 
+# decides the colour of pixels tetrimoes on the board
 def colour_in(tetrimo, highlight=False):
 
 	if highlight == False:
@@ -40,6 +43,28 @@ def colour_in(tetrimo, highlight=False):
 			number = 14
 	
 	return number
+
+# 7 bag system
+def new_bag():
+	global tetrimoes
+	global bag
+
+	bag = []
+	for shape in list(tetrimoes.values()):
+		bag.append(shape)
+	random.shuffle(bag)
+
+def new_tetrimo():
+	global tetrimoes
+	global bag
+
+	try:
+		tetrimo = bag.pop(0) # pop will remove first item and assign it to return thing
+	except: # in case bag has run out
+		new_bag()
+		tetrimo = bag.pop(0)
+
+	return tetrimo
     
 
 # hard coded each piece's position cos it was easier than the other methods
@@ -126,7 +151,9 @@ empty_grid = [
 	[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 ]
 
-tetrimo = random.choice(list(tetrimoes.values())) # pick random tetrimo from tetrimoes
+bag = []
+new_bag()
+tetrimo = new_tetrimo() # pick random tetrimo from tetrimoes
 colour = colour_in(tetrimo) 
 
 grid_permanent = copy.deepcopy(empty_grid) # copy off empty/default grid
@@ -138,12 +165,17 @@ ghost_origin_y = shape_origin_y
 score = 0
 level = 1
 lines_cleared = 0
+fps_start = time.time()
+fps = 1
+fps_count = 0
 
 gravity_timer = time.time()
 default_gravity = (0.8-((level-1)*0.007))**level
 gravity = default_gravity
 gameover = False
 
+hold_piece = 'none'
+hold = False
 move = False
 right = False
 left = False
@@ -157,7 +189,7 @@ arr_start = 0
 # player settings
 das = 0.12 # delay before repeating in seconds
 arr = 0.04 # delay before each repeat in seconds
-sdf = 0.05 # percentage of gravity time
+sdf = 0.02 # percentage of gravity time
 
 
 # very disorganised spaghetti loop
@@ -189,10 +221,9 @@ while True:
 			score += 100*level
 			lines_cleared += 1
 
-	if (lines_cleared / 10) == level:
+	if (lines_cleared / 10) >= level:
 		level += 1
 		default_gravity = (0.8-((level-1)*0.007))**level
-		level_lines = 10
 
 	# setup for what the player sees
 	next = False
@@ -224,10 +255,11 @@ while True:
 					grid_permanent[shape_origin_y+piece[0]][shape_origin_x+piece[1]] = colour
 				# restarting the shape for the next time it comes up again
 				tetrimo['state'] = 'a_flat'
-				tetrimo = random.choice(list(tetrimoes.values())) # pick random tetrimo from tetrimoes
+				tetrimo = new_tetrimo() # pick random tetrimo from bag
 				shape_origin_x = 4
 				shape_origin_y = 1
 				colour = colour_in(tetrimo) 
+				hold = False # this allows for holding again
 
 	# putting the ghost piece into the grid
 	loop = True
@@ -242,13 +274,61 @@ while True:
 		ghost_origin_y += 1
 	
 	ghost_origin_y -= 1
-	colour = colour_in(tetrimo, True)
+	ghost_colour = colour_in(tetrimo, True)
 	for name, shape in tetrimo.items():
 		if name == tetrimo['state']:
 			for piece in shape:
 				if grid[ghost_origin_y+piece[0]][shape_origin_x+piece[1]] == 0: # lets the real piece have priority
-					grid[ghost_origin_y+piece[0]][shape_origin_x+piece[1]] = colour
-	colour = colour_in(tetrimo) # reverting colour just in case
+					grid[ghost_origin_y+piece[0]][shape_origin_x+piece[1]] = ghost_colour
+
+	# hold pieces
+	hold_grid = [
+		[0, 0, 0, 0],
+		[0, 0, 0, 0],
+		[0, 0, 0, 0],
+		[0, 0, 0, 0]
+	]
+	if hold_piece != 'none':
+		if hold == False:
+			hold_colour = colour_in(hold_piece)
+		else:
+			hold_colour = 3
+		for name, shape in hold_piece.items():
+			if name == 'a_flat': # comparing it to "a_flat" keeps it in default position
+				for piece in shape: # updating the permanent grid
+					hold_grid[2+piece[0]][1+piece[1]] = hold_colour
+		colour = colour_in(tetrimo)
+
+	row_number = 0
+	display = [
+		[0, 0, 0, 0],
+		[0, 0, 0, 0],
+		[0, 0, 0, 0],
+		[0, 0, 0, 0]
+	]
+	for row in hold_grid:
+		pixel_number = 0
+		for pixel in row:
+			if pixel == 0:
+				display[row_number][pixel_number] = '·'
+			elif pixel == 1:
+				display[row_number][pixel_number] = colored('■', 'cyan')
+			elif pixel == 2:
+				display[row_number][pixel_number] = colored('■', 'blue')
+			elif pixel == 3:
+				display[row_number][pixel_number] = '■'
+			elif pixel == 4:
+				display[row_number][pixel_number] = colored('■', 'yellow')
+			elif pixel == 5:
+				display[row_number][pixel_number] = colored('■', 'green')
+			elif pixel == 6:
+				display[row_number][pixel_number] = colored('■', 'magenta')
+			elif pixel == 7:
+				display[row_number][pixel_number] = colored('■', 'red')
+			
+			pixel_number += 1
+		row_number += 1
+	hold_grid = display
 
 	if grid != previous_frame: # if nothing has changed, no point in printing new one
 		display = '' # top of box
@@ -258,7 +338,7 @@ while True:
 			row_number += 1
 			for pixel in row:
 				if pixel == 0:
-					display += '. '
+					display += '· '
 				
 				# colours!
 				elif pixel == 1:
@@ -290,20 +370,24 @@ while True:
 					display += colored('▢ ', 'magenta')
 				elif pixel == 14:
 					display += colored('▢ ', 'red')
-					
+			
 			if row_number == 1:
-				display += f'│ LEVEL: {level}\n│ '
+				display += f'│ LEVEL: {level}\n│ {hold_grid[1][0]} {hold_grid[1][1]} {hold_grid[1][2]} {hold_grid[1][3]} ││ '
 			elif row_number == 2:
-				display += f'│ LINES: {lines_cleared}\n│ '
+				display += f'│ LINES: {lines_cleared}\n│ {hold_grid[2][0]} {hold_grid[2][1]} {hold_grid[2][2]} {hold_grid[2][3]} ││ '
 			elif row_number == 3:
-				display += f'│ SCORE: {score}\n│ '
+				display += f'│ SCORE: {score}\n│ {hold_grid[3][0]} {hold_grid[3][1]} {hold_grid[3][2]} {hold_grid[3][3]} ││ '
+			elif row_number == 4:
+				display += f'│\n└─────────┘│ '
+			elif row_number == 5:
+				display += f'│ {fps} FPS\n           │ '
 			elif row_number == 20:
 				display += '│\n'	
 			else:
-				display += '│\n│ '	
+				display += '│\n           │ '	
 		
-		display = '┌─────────────────────┐\n│ ' + display # top of box
-		display += '└─────────────────────┘\n' # bottom of box
+		display = f'┌─────────┐┌─────────────────────┐\n│ {hold_grid[0][0]} {hold_grid[0][1]} {hold_grid[0][2]} {hold_grid[0][3]} ││ ' + display # top of box
+		display += '           └─────────────────────┘\n          ' # bottom of box
 		print(display)
 
 	# INPUT
@@ -503,14 +587,49 @@ while True:
 							grid_permanent[shape_origin_y+piece[0]][shape_origin_x+piece[1]] = colour
 				# restarting the shape for the next time it comes up again
 				tetrimo['state'] = 'a_flat'
-				tetrimo = random.choice(list(tetrimoes.values())) # pick random tetrimo from tetrimoes
+				tetrimo = new_tetrimo() # pick random tetrimo from tetrimoes
 				shape_origin_x = 4
 				shape_origin_y = 1
 				colour = colour_in(tetrimo) 
 				next = False
+				hold = False # allows player to hold again
 		
 		hard_drop = True
 	else:
 		hard_drop = False
-		
-		
+	
+	if keyboard.is_pressed('shift'):
+		if hold == False:
+			if hold_piece != 'none':
+				# this code switches the hold piece and tetrimo
+				placeholder = hold_piece
+				hold_piece = tetrimo
+				tetrimo = placeholder
+				colour_in(tetrimo)
+
+				hold_piece["state"] = 'a_flat'
+				shape_origin_y = 1
+				shape_origin_x = 4
+
+			else:
+				print(tetrimo)
+				hold_piece = copy.deepcopy(tetrimo) # fill hold with current tetrimo
+
+				# get new tetrimo
+				tetrimo['state'] = 'a_flat'
+				tetrimo = new_tetrimo() # pick random tetrimo from tetrimoes
+
+				hold_piece["state"] = 'a_flat'
+				shape_origin_x = 4
+				shape_origin_y = 1
+				next = False
+			hold = True
+	
+	# fps counting
+	try:
+		fps = round((1 / (time.time()-fps_start) / fps_count), 2) # calculates the fps
+		fps_start = time.time() # resets the fps start time
+		fps_count = 0 # this variable is for taking into account the amount of frames we have skipped because of the zero division error
+	except:
+		pass
+	fps_count += 1
