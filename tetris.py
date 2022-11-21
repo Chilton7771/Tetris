@@ -182,7 +182,6 @@ fps_count = 0
 gravity_timer = time.time()
 default_gravity = (0.8-((level-1)*0.007))**level # this equation gives us the time in between each fall of the piece
 gravity = default_gravity
-print(gravity)
 lock_delay = 0.5 # delay before blocks lock onto the ground in seconds
 gameover = False
 
