@@ -4,7 +4,6 @@ import copy
 import keyboard
 import random
 import time
-from termcolor import colored
 
 
 # decides the colour of pixels tetrimoes on the board
@@ -44,7 +43,7 @@ def colour_in(tetrimo, highlight=False):
 	
 	return number
 
-# 7 bag system
+# makes a new bag
 def new_bag():
 	global tetrimoes
 	global bag
@@ -54,6 +53,7 @@ def new_bag():
 		bag.append(shape)
 	random.shuffle(bag)
 
+# picks out a new tetrimo from the bag 
 def new_tetrimo():
 	global tetrimoes
 	global bag
@@ -65,7 +65,17 @@ def new_tetrimo():
 		tetrimo = bag.pop(0)
 
 	return tetrimo
-    
+
+# resets the value of lock delay
+def reset_lock_delay(ground_touch='none'):
+	global lock_delay
+
+	if ground_touch == 'none' or ground_touch == True:
+		lock_delay = 0.5
+
+# this function allows us to specify text colour with 24 bit colours
+def colored(text, rgb):
+    return "\033[38;2;{};{};{}m{}\033[38;2;255;255;255m".format(rgb[0], rgb[1], rgb[2], text)
 
 # hard coded each piece's position cos it was easier than the other methods
 tetrimoes = {
@@ -170,8 +180,10 @@ fps = 1
 fps_count = 0
 
 gravity_timer = time.time()
-default_gravity = (0.8-((level-1)*0.007))**level
+default_gravity = (0.8-((level-1)*0.007))**level # this equation gives us the time in between each fall of the piece
 gravity = default_gravity
+print(gravity)
+lock_delay = 0.5 # delay before blocks lock onto the ground in seconds
 gameover = False
 
 hold_piece = 'none'
@@ -180,16 +192,17 @@ move = False
 right = False
 left = False
 hard_drop = False
-soft_drop = False
 clockwise = False
 anti_clockwise = False
 das_start = 0
 arr_start = 0
+lock_delay_start = 0
+ground_touch = False
 
 # player settings
 das = 0.12 # delay before repeating in seconds
 arr = 0.04 # delay before each repeat in seconds
-sdf = 0.02 # percentage of gravity time
+sdf = 20 # multiplication of the speed of gravity
 
 
 # very disorganised spaghetti loop
@@ -201,9 +214,12 @@ while True:
 		if pixel != 0:
 			gameover = True
 
-	if gameover == True:		
+	# ending the game
+	if gameover == True: # losing the game		
 		grid_permanent = copy.deepcopy(empty_grid)
 		score = 0
+		level = 0
+		lines_cleared = 0
 		print('gameover')
 		input('>>> ')
 		gameover = False
@@ -230,10 +246,9 @@ while True:
 	previous_frame = copy.deepcopy(grid) # previous grid, later it will compare with new grid to make sure something happened
 	grid = copy.deepcopy(grid_permanent) # update new blank grid with what has happened so far
 
-	if (time.time()-gravity_timer) > gravity:
+	if (time.time()-gravity_timer) > gravity and ground_touch == False:
 		shape_origin_y += 1 # move tetrimo down
 		gravity_timer = time.time()
-
 
 	# making/updating the grids		
 	for name, shape in tetrimo.items():
@@ -242,12 +257,20 @@ while True:
 			for piece in shape:
 
 				# checking if tetrimo has touched anything
-				if shape_origin_y+piece[0] == 19 or grid_permanent[shape_origin_y+piece[0]+1][shape_origin_x+piece[1]] != 0:
-					# first one is checking for floor, second one is checking for other tetrimo
-
-					next = True
+				if (shape_origin_y+piece[0] == 19 or grid_permanent[shape_origin_y+piece[0]+1][shape_origin_x+piece[1]] != 0) and ground_touch == False:
+					ground_touch = True
+					lock_delay_start = time.time()
 				else:
 					grid[shape_origin_y+piece[0]][shape_origin_x+piece[1]] = colour
+
+			if ground_touch == True:
+				lock_delay -= time.time() - lock_delay_start
+				lock_delay_start = time.time()
+
+				if lock_delay < 0:
+					next = True
+					ground_touch = False
+					reset_lock_delay()
 
 			# keeping the piece in place after it has touched the floor
 			if next == True:
@@ -292,7 +315,7 @@ while True:
 		if hold == False:
 			hold_colour = colour_in(hold_piece)
 		else:
-			hold_colour = 3
+			hold_colour = 8 # 8 means no colour
 		for name, shape in hold_piece.items():
 			if name == 'a_flat': # comparing it to "a_flat" keeps it in default position
 				for piece in shape: # updating the permanent grid
@@ -312,19 +335,21 @@ while True:
 			if pixel == 0:
 				display[row_number][pixel_number] = '·'
 			elif pixel == 1:
-				display[row_number][pixel_number] = colored('■', 'cyan')
+				display[row_number][pixel_number] = colored('■', [0, 229, 255]) # cyan
 			elif pixel == 2:
-				display[row_number][pixel_number] = colored('■', 'blue')
+				display[row_number][pixel_number] = colored('■', [0, 34, 255]) # blue
 			elif pixel == 3:
-				display[row_number][pixel_number] = '■'
+				display[row_number][pixel_number] = colored('■', [255, 128, 0]) # orange
 			elif pixel == 4:
-				display[row_number][pixel_number] = colored('■', 'yellow')
+				display[row_number][pixel_number] = colored('■', [255, 255, 0]) # yellow
 			elif pixel == 5:
-				display[row_number][pixel_number] = colored('■', 'green')
+				display[row_number][pixel_number] = colored('■', [0, 255, 0]) # green
 			elif pixel == 6:
-				display[row_number][pixel_number] = colored('■', 'magenta')
+				display[row_number][pixel_number] = colored('■', [140, 0, 200]) # purple
 			elif pixel == 7:
-				display[row_number][pixel_number] = colored('■', 'red')
+				display[row_number][pixel_number] = colored('■', [255, 0, 0]) # red
+			elif pixel == 8:
+				display[row_number][pixel_number] = colored('■', [171, 171, 171]) # grey
 			
 			pixel_number += 1
 		row_number += 1
@@ -342,34 +367,34 @@ while True:
 				
 				# colours!
 				elif pixel == 1:
-					display += colored('■ ', 'cyan')
+					display += colored('■ ', [0, 229, 255]) # cyan
 				elif pixel == 2:
-					display += colored('■ ', 'blue')
+					display += colored('■ ', [0, 34, 255]) # blue
 				elif pixel == 3:
-					display += '■ '
+					display += colored('■ ', [255, 128, 0]) # orange
 				elif pixel == 4:
-					display += colored('■ ', 'yellow')
+					display += colored('■ ', [255, 255, 0]) # yellow
 				elif pixel == 5:
-					display += colored('■ ', 'green')
+					display += colored('■ ', [0, 255, 0]) # green
 				elif pixel == 6:
-					display += colored('■ ', 'magenta')
+					display += colored('■ ', [140, 0, 200]) # purple
 				elif pixel == 7:
-					display += colored('■ ', 'red')
+					display += colored('■ ', [255, 0, 0]) # red
 				
 				elif pixel == 8:
-					display += colored('▢ ', 'cyan')
+					display += colored('▢ ', [0, 229, 255]) # cyan
 				elif pixel == 9:
-					display += colored('▢ ', 'blue')
+					display += colored('▢ ', [0, 34, 255]) # blue
 				elif pixel == 10:
-					display += colored('▢ ', 'white')
+					display += colored('▢ ', [255, 128, 0]) # orange
 				elif pixel == 11:
-					display += colored('▢ ', 'yellow')
+					display += colored('▢ ', [255, 255, 0]) # yellow
 				elif pixel == 12:
-					display += colored('▢ ', 'green')
+					display += colored('▢ ', [0, 255, 0]) # green
 				elif pixel == 13:
-					display += colored('▢ ', 'magenta')
+					display += colored('▢ ', [140, 0, 200]) # purple
 				elif pixel == 14:
-					display += colored('▢ ', 'red')
+					display += colored('▢ ', [255, 0, 0]) # red
 			
 			if row_number == 1:
 				display += f'│ LEVEL: {level}\n│ {hold_grid[1][0]} {hold_grid[1][1]} {hold_grid[1][2]} {hold_grid[1][3]} ││ '
@@ -424,6 +449,8 @@ while True:
 								tetrimo["state"] = "b_upright"
 							elif tetrimo["state"] == "b_upright":
 								tetrimo["state"] = "a_flat"
+
+			reset_lock_delay(ground_touch)
 		
 		anti_clockwise = True
 	else:
@@ -452,7 +479,7 @@ while True:
 						elif shape_origin_x+piece[1] < 0: # second bit because pieces can still clip with the opposite rotation
 							shape_origin_x += 1 # moves piece to the right, out of wall
 						
-						# immediately rotating back if pieces go into others when rotating
+						# immediately rotating back if pieces go into others when rotating [TEMPORARY SOLUTION]
 						if grid_permanent[shape_origin_y+piece[0]+1][shape_origin_x+piece[1]] > 0:
 							if tetrimo["state"] == "a_flat":
 								tetrimo["state"] = "b_upright"
@@ -462,6 +489,9 @@ while True:
 								tetrimo["state"] = "a_upright"
 							elif tetrimo["state"] == "a_upright":
 								tetrimo["state"] = "a_flat"
+
+
+			reset_lock_delay(ground_touch)
 		
 		clockwise = True
 	else:
@@ -470,7 +500,8 @@ while True:
 	# moving left
 	if keyboard.is_pressed('left'):
 		
-		# check if left was the previous keypress, if not then restart DAS and do initial move
+		# check if left was the previous keypress, if not then restart DAS and do 
+		# initial move
 		if left == False:
 			das_start = time.time()
 			move = True
@@ -478,7 +509,7 @@ while True:
 			for name, shape in tetrimo.items():
 				if name == tetrimo['state']:
 					for piece in shape:
-						if shape_origin_x+piece[1] == 0 or grid_permanent[shape_origin_y+piece[0]+1][shape_origin_x+piece[1]-1] > 0:
+						if shape_origin_x+piece[1] == 0 or grid_permanent[shape_origin_y+piece[0]][shape_origin_x+piece[1]-1] > 0:
 							move = False
 			
 
@@ -497,6 +528,7 @@ while True:
 		if move == True:
 			move = False
 			shape_origin_x -= 1
+			reset_lock_delay(ground_touch)
 
 		left = True # state that the previous key is left
 	else:
@@ -506,7 +538,8 @@ while True:
 	# moving right
 	if keyboard.is_pressed('right'):
 
-		# check if right was the previous keypress, if not then restart DAS and do initial move
+		# check if right was the previous keypress, if not then restart DAS and do 
+		# initial move
 		if right == False:
 			das_start = time.time()
 			move = True
@@ -524,16 +557,18 @@ while True:
 				arr_start = time.time()
 				move = True
 
-				# this code checks if any piece is on the border of grid, might turn into function later
+				# this code checks if any piece is on the border of grid, might turn 
+				# into function later
 				for name, shape in tetrimo.items():
 					if name == tetrimo['state']:
 						for piece in shape:
-							if shape_origin_x+piece[1] == 9 or grid_permanent[shape_origin_y+piece[0]+1][shape_origin_x+piece[1]+1] > 0:
+							if shape_origin_x+piece[1] == 9 or grid_permanent[shape_origin_y+piece[0]][shape_origin_x+piece[1]+1] > 0:
 								move = False
 
 		if move == True:
 			move = False
 			shape_origin_x += 1
+			reset_lock_delay(ground_touch)
 
 		right = True # state that the previous key is right
 	else:
@@ -541,7 +576,7 @@ while True:
 
 	# flipping the tetrimo
 	if keyboard.is_pressed('backspace'):
-		if flip == False:
+		if flipped == False:
 			if tetrimo["state"] == "a_flat":
 				tetrimo["state"] = "b_flat"
 			elif tetrimo["state"] == "b_flat":
@@ -551,16 +586,21 @@ while True:
 				tetrimo["state"] = "b_upright"
 			elif tetrimo["state"] == "b_upright":
 				tetrimo["state"] = "a_upright"
-		flip = True
+
+			reset_lock_delay(ground_touch)
+		flipped = True
 	
 	else:
-		flip = False
+		flipped = False
 
 	# soft drop
 	if keyboard.is_pressed('down'):
-		gravity = sdf
+		# the if statement below checks if we have already sped up the gravity so
+		# that we dont divide the gravity multiple times
+		if gravity != (default_gravity / sdf):
+			gravity /= sdf # divides the time it takes to go to the next cell
+
 	else:
-		soft_drop == False
 		gravity = default_gravity
 	
 	# hard drop
@@ -572,14 +612,16 @@ while True:
 					if name == tetrimo['state']:
 						for piece in shape:
 							if shape_origin_y+piece[0] == 19 or grid_permanent[shape_origin_y+piece[0]+1][shape_origin_x+piece[1]] != 0:
-								# first one is checking for floor, second one is checking for other tetrimo
+								# first one is checking for floor, second one is 
+								# checking for other tetrimo
 
 								next = True
 								hard_drop_loop = False
 				shape_origin_y += 1
 
 			if next == True:
-				shape_origin_y -= 1 # this makes it so that Y does not end up being 20 which is out of index range
+				shape_origin_y -= 1 # this makes it so that Y does not end up being 
+				                    #20 which is out of index range
 
 				for name, shape in tetrimo.items():
 					if name == tetrimo['state']:
@@ -625,11 +667,31 @@ while True:
 				next = False
 			hold = True
 	
+	# reset the game
+	if keyboard.is_pressed('p'):
+		grid_permanent = copy.deepcopy(empty_grid)
+		score = 0
+		level = 0
+		lines_cleared = 0
+		
+		# resetting the current tetrimo
+		tetrimo['state'] = 'a_flat'
+		tetrimo = new_tetrimo() # pick random tetrimo from tetrimoes
+		shape_origin_x = 4
+		shape_origin_y = 1
+		colour = colour_in(tetrimo) 
+		next = False
+		hold = False # allows player to hold again
+		hold_piece = 'none'
+	
 	# fps counting
 	try:
-		fps = round((1 / (time.time()-fps_start) / fps_count), 2) # calculates the fps
+		fps = round((1 / (time.time()-fps_start) / fps_count)) # calculates the fps
 		fps_start = time.time() # resets the fps start time
-		fps_count = 0 # this variable is for taking into account the amount of frames we have skipped because of the zero division error
+		fps_count = 0 # this variable is for taking into account the amount of 
+		              # frames we have skipped because of the zero division error
+
 	except:
 		pass
 	fps_count += 1
+
