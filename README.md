@@ -1,5 +1,4 @@
-# Tetris
-Tetris in terminal
+# Tetris in Terminal
 
 This is a tetris game i made in python that uses the text on terminal as its display.
 It is currently a work in progress and is still lacking a lot of features a tetris
