@@ -1,0 +1,3 @@
+ - rotation ignores other pieces (needs kickback system)
+ - lock delay system applying even when piece has moved off the ground by moving sideways
+ - gameover for no reason after hard drop sometimes
